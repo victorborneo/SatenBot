@@ -1,0 +1,131 @@
+from asyncio import sleep
+
+import discord
+from discord.ext import commands
+
+from functions import send_message  # pylint: disable=import-error
+from variables import color_codes  # pylint: disable=import-error
+
+
+class Roles(commands.Cog):
+    """
+    Commands related to Roles.
+    """
+    def __init__(self, client):
+        self.client = client
+
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.has_permissions(kick_members=True)
+    @commands.bot_has_permissions(manage_roles=True)
+    @commands.command(brief="Create a role without any permissions.",
+                      aliases=['crtr'])
+    async def createrole(self, ctx, color, *, name):
+        """
+        Creates a role without any permissions.
+        The "color" argument can be:
+        red, green, blue, black, white, gold, or any valid hex color code
+        (like 0xffffff)
+        """
+        roles = ctx.guild.roles
+
+        if len(roles) >= 200:
+            await send_message(ctx, "Server already has 200 or more roles.")
+            return
+
+        role_exists = discord.utils.get(roles, name=name)
+
+        if role_exists is not None:
+            await send_message(ctx,
+                               f"Role {role_exists.mention} "
+                               "already exists in this server.")
+            return
+
+        guild = ctx.guild
+        color = color.replace("#", "0x")
+        if color.lower() in color_codes.keys():
+            color = color_codes[color.lower()]
+
+        try:
+            role = await guild.create_role(name=name,
+                                           colour=discord.Colour(int(color, 0))
+                                           )
+        except TypeError:
+            role = await guild.create_role(name=name,
+                                           colour=discord.Colour(color)
+                                           )
+        except (ValueError, discord.errors.HTTPException):
+            await send_message(ctx, "Unknown color.")
+            return
+
+        await sleep(1)
+        await send_message(ctx, f"Created role {role.mention}")
+
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.has_permissions(kick_members=True)
+    @commands.bot_has_permissions(manage_roles=True)
+    @commands.command(brief="Give a specific role to someone.",
+                      aliases=['gvr'])
+    async def giverole(self, ctx, member: discord.Member, *,
+                       role: discord.Role):
+        """
+        Gives a specific role to a specific mentioned member.
+        """
+        roles = member.roles
+
+        if len(roles) >= 20:
+            await send_message(ctx, "Member already have too many roles.")
+            return
+
+        if role in roles:
+            await send_message(ctx, f"{member.mention} already has role "
+                                    f"{role.mention}.")
+            return
+
+        try:
+            await member.add_roles(role)
+        except discord.errors.Forbidden:
+            await send_message(ctx, "Sorry, that role is too powerful...")
+        else:
+            await send_message(ctx, f"Added role {role.mention} "
+                                    f"to member {member.mention}.")
+
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.bot_has_permissions(manage_roles=True)
+    @commands.command(brief="Remove a specific role from someone or yourself.",
+                      aliases=["rmvr"])
+    async def removerole(self, ctx, member: discord.Member, *,
+                         role: discord.Role):
+        """
+        Can only be done on other people's roles if you have permission,
+        but works to remove your own roles.
+        """
+        if not (ctx.message.author.guild_permissions.kick_members or
+                member == ctx.message.author):
+            await send_message(ctx, "You can't remove other people's roles.")
+            return
+
+        try:
+            await member.remove_roles(role)
+        except discord.errors.Forbidden:
+            await send_message(ctx,
+                               "That role is too powerful for me to remove..."
+                               )
+        else:
+            await send_message(ctx, f"{member.mention} is no longer "
+                                    f"{role.mention}.")
+
+    @giverole.error
+    @removerole.error
+    async def member_error(self, ctx, error):
+        """
+        Checks if member exists.
+        """
+        if isinstance(error, commands.BadArgument):
+            await send_message(ctx, "Unknown user or role.")
+
+
+def setup(client):
+    """
+    Setup the Cog.
+    """
+    client.add_cog(Roles(client))

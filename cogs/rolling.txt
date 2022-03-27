@@ -1,0 +1,325 @@
+import random
+import datetime
+
+import discord
+from discord.ext import commands, tasks
+from discord.ext.commands.core import wrap_callback
+
+from variables import connection  # pylint: disable=import-error
+from variables import bot_tasks  # pylint: disable=import-error
+from functions import paginator  # pylint: disable=import-error
+from functions import send_message  # pylint: disable=import-error
+from functions import get_info_by_odd  # pylint: disable=import-error
+from functions import get_info_by_rank  # pylint: disable=import-error
+from functions import get_money_info  # pylint: disable=import-error
+
+
+@tasks.loop(hours=1)
+async def reset_rolls():
+    cursor = connection.cursor()
+    with connection:
+        cursor.execute("""
+            UPDATE user_guild_data
+            SET rolls=1
+        """)
+    cursor.close()
+
+
+@tasks.loop(hours=24)
+async def reset_dailies():
+    cursor = connection.cursor()
+    with connection:
+        cursor.execute("""
+            UPDATE user
+            SET daily=1, mdaily=1
+        """)
+    cursor.close()
+
+
+class Rolling(commands.Cog):
+    """
+    Commands related to Rolling on the Sticker album feature.
+    """
+
+    def __init__(self, client, reset_rolls, reset_dailies):
+        self.client = client
+        self.reset_rolls = reset_rolls
+        self.reset_dailies = reset_dailies
+
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.command(brief="Collect anime stickers!")
+    @commands.guild_only()
+    async def pack(self, ctx):
+        """
+        Collect anime stickers and fill up your album!
+        """
+        cursor = connection.cursor()
+        cursor.execute("""
+            INSERT OR IGNORE INTO user (id, username)
+            VALUES (:uid, :name)
+        """, {"uid": ctx.message.author.id,
+              "name": f"{ctx.message.author.name}"
+              f"#{ctx.message.author.discriminator}"})
+
+        cursor.execute("""
+            INSERT INTO user_guild_data
+            (user_id, guild_id, rolls)
+            VALUES (:uid, :gid, 0)
+            ON CONFLICT(user_id, guild_id) DO UPDATE SET
+            rolls=0 WHERE user_id=:uid AND guild_id=:gid
+            AND rolls=1
+        """, {
+            "uid": ctx.message.author.id,
+            "gid": ctx.message.guild.id
+        })
+
+        if not cursor.rowcount:
+            connection.commit()
+            cursor.close()
+            next_ = vars(self.reset_rolls)["_next_iteration"] - \
+                datetime.datetime.now(datetime.timezone.utc)
+            await send_message(ctx, "Rolls on cooldown!\n"
+                               f"**{str(next_)[2:-7]}** until reset.")
+            return
+
+        wl = list(map(lambda x: x["rank"], cursor.execute("""
+            SELECT anime.rank
+            FROM wishes
+            JOIN anime ON
+            (anime.id=wishes.anime_id)
+            WHERE wishes.user_id=:uid
+            AND wishes.guild_id=:gid
+            UNION
+            SELECT wl_boost
+            FROM user_guild_data
+            WHERE user_guild_data.user_id=:uid
+            AND user_guild_data.guild_id=:gid
+        """, {
+            "uid": ctx.message.author.id,
+            "gid": ctx.message.guild.id
+        }).fetchall()))
+
+        rolls = []
+        for _ in range(10):
+            if len(wl) and random.random() <= 0.00001 * wl[0]:
+                rank = random.choice(wl[1:])
+                info = get_info_by_rank(rank).copy()
+            else:
+                info = get_info_by_odd(random.random()).copy()
+                info["wl"] = ("", "")
+                rank = random.randint(
+                    info["start"],
+                    info["end"]
+                )
+
+            if rank in wl:
+                info["color"] = 0xff0022
+                info["wl"] = ("**__Wishlist Roll!!!__**\n\n", " **(WL!)**")
+
+            rolls.append((
+                rank,
+                info["rarity"],
+                info["color"],
+                info["wl"]
+            ))
+
+        rolls = [{
+            **x,
+            "rarity": rolls[count][1],
+            "color": rolls[count][2],
+            "wl": rolls[count][3]
+        } for count, x in enumerate(cursor.execute(f"""
+            SELECT id, name, anime.rank, image, value FROM anime
+            JOIN ({' '.join(['SELECT ? AS rank UNION ALL']*10)[:-10]}) x
+            ON x.rank=anime.rank
+        """, [x[0] for x in rolls]).fetchall())]
+
+        embeds = []
+        for roll in rolls:
+            embed = discord.Embed(
+                title=roll["name"],
+                description=f"{roll['wl'][0]}**{roll['rarity']}**\n"
+                            f"#{roll['rank']}\n\n💰**{roll['value']}**",
+                color=roll["color"]
+            )
+            embed.set_image(url=roll["image"])
+            embeds.append(embed)
+
+            cursor.execute("""
+                INSERT INTO obtains
+                (user_id, anime_id, guild_id, amount)
+                VALUES (:uid, :aid, :gid, 1)
+                ON CONFLICT(user_id, anime_id, guild_id)
+                DO UPDATE SET amount=amount+1
+            """, {
+                "uid": ctx.message.author.id,
+                "aid": roll["id"],
+                "gid": ctx.message.guild.id
+            })
+
+        connection.commit()
+        cursor.close()
+
+        embeds.append(
+            discord.Embed(
+                title="Simplified",
+                description="\n".join(map(
+                    lambda x: f"**{x['rank']}** - {x['name']}{x['wl'][1]}",
+                    rolls)
+                ),
+                color=0xffa500
+            )
+        )
+
+        await paginator(ctx, self.client, embeds, True)
+
+    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.command(brief="Claim your daily bonus reward!")
+    @commands.guild_only()
+    async def daily(self, ctx):
+        """
+        Claim your daily bonus reward!
+        """
+        cursor = connection.cursor()
+        with connection:
+            cursor.execute("""
+                INSERT INTO user (id, username, bonuses, daily)
+                VALUES (:uid, :name, 1, 0)
+                ON CONFLICT(id) DO UPDATE SET
+                bonuses=bonuses+1, daily=0
+                WHERE id=:uid AND daily=1
+            """, {"uid": ctx.message.author.id,
+                  "name": f"{ctx.message.author.name}"
+                  f"#{ctx.message.author.discriminator}"})
+        cursor.close()
+
+        if cursor.rowcount:
+            await ctx.message.add_reaction("✅")
+            return
+
+        next_ = vars(self.reset_dailies)["_next_iteration"] - \
+            datetime.datetime.now(datetime.timezone.utc)
+        await send_message(ctx, "Daily on cooldown!\n"
+                           f"**{str(next_)[:-7]}** until reset.")
+
+    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.command(brief="Claim your daily money reward!",
+                      aliases=["dailym"])
+    @commands.guild_only()
+    async def dailymoney(self, ctx):
+        """
+        Claim your daily money reward!
+        """
+        cursor = connection.cursor()
+        cursor.execute("""
+            INSERT INTO user (id, username, mdaily)
+            VALUES (:uid, :name, 0)
+            ON CONFLICT(id) DO UPDATE SET
+            mdaily=0 WHERE id=:uid AND mdaily=1
+        """, {"uid": ctx.message.author.id,
+              "name": f"{ctx.message.author.name}"
+              f"#{ctx.message.author.discriminator}"})
+
+        if not cursor.rowcount:
+            connection.commit()
+            cursor.close()
+            next_ = vars(self.reset_dailies)["_next_iteration"] - \
+                datetime.datetime.now(datetime.timezone.utc)
+            await send_message(ctx, "Daily on cooldown!\n"
+                               f"**{str(next_)[:-7]}** until reset.")
+            return
+
+        bonus = get_money_info(random.random())
+        bonus = random.randint(bonus["start"], bonus["end"])
+
+        cursor.execute("""
+            INSERT INTO user_guild_data (user_id, guild_id, balance)
+            VALUES (:uid, :gid, :value)
+            ON CONFLICT(user_id, guild_id) DO UPDATE SET
+            balance=balance+:value WHERE user_id=:uid AND guild_id=:gid
+        """, {
+            "uid": ctx.message.author.id,
+            "gid": ctx.message.guild.id,
+            "value": bonus
+        })
+
+        connection.commit()
+        cursor.close()
+        await send_message(ctx, f"+💰{bonus}!")
+
+    @commands.cooldown(1, 10, commands.BucketType.user)
+    @commands.command(brief="Claim one of your bonuses!")
+    @commands.guild_only()
+    async def bonus(self, ctx):
+        """
+        Claim one of your bonuses!
+        Only one bonus can be used per hour, per server.
+        """
+        cursor = connection.cursor()
+        data = cursor.execute("""
+            SELECT user.bonuses,
+            user_guild_data.rolls,
+            IFNULL(user_guild_data.next_bonus,
+                '0001-01-01 00:00:00.000000') AS nbonus
+            FROM user
+            JOIN user_guild_data ON
+            (user_guild_data.user_id=:uid
+            AND user_guild_data.guild_id=:gid)
+            WHERE user.id=:uid
+        """, {
+            "uid": ctx.message.author.id,
+            "gid": ctx.message.guild.id
+        }).fetchone()
+
+        if data is None or data["rolls"]:
+            cursor.close()
+            await send_message(ctx, "Your package is already ready!")
+            return
+        if not data["bonuses"]:
+            cursor.close()
+            await send_message(ctx, "You don't have bonuses!")
+            return
+
+        now = datetime.datetime.now()
+        nbonus = datetime.datetime.strptime(
+            data["nbonus"],
+            "%Y-%m-%d %H:%M:%S.%f"
+        )
+        if now < nbonus:
+            cursor.close()
+            await send_message(ctx,
+                               "You can use a bonus in this guild again in "
+                               f"**{str(nbonus - now)[2:-7]}**")
+            return
+
+        cursor.execute("""
+            UPDATE user_guild_data
+            SET rolls=1, next_bonus=:nbonus
+            WHERE user_id=:uid
+            AND guild_id=:gid
+        """, {
+            "nbonus": str(datetime.datetime.now() +
+                          datetime.timedelta(hours=1)),
+            "uid": ctx.message.author.id,
+            "gid": ctx.message.guild.id
+        })
+        cursor.execute("""
+            UPDATE user
+            SET bonuses=bonuses-1
+            WHERE id=:uid
+        """, {"uid": ctx.message.author.id})
+
+        connection.commit()
+        cursor.close()
+        await ctx.message.add_reaction("✅")
+
+
+def setup(client):
+    """
+    Setup the Cog.
+    """
+    reset_rolls.start()
+    reset_dailies.start()
+    client.add_cog(Rolling(client, reset_rolls, reset_dailies))
+    bot_tasks.add_task("rolling", reset_rolls)
+    bot_tasks.add_task("rolling", reset_dailies)

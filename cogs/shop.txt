@@ -1,0 +1,264 @@
+import discord
+from discord.ext import commands
+
+from variables import connection  # pylint: disable=import-error
+from variables import store  # pylint: disable=import-error
+from functions import send_embed  # pylint: disable=import-error
+from functions import send_message  # pylint: disable=import-error
+from functions import confirm  # pylint: disable=import-error
+
+
+class Shopping(commands.Cog):
+    """
+    Commands related to the album shop.
+    """
+
+    def __init__(self, client):
+        self.client = client
+
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.command(brief="Check what selling on the store!")
+    @commands.guild_only()
+    async def shop(self, ctx):
+        """
+        Check what selling on the store!
+        """
+        cursor = connection.cursor()
+        info = cursor.execute("""
+            SELECT wl_limit, wl_boost
+            FROM user_guild_data
+            WHERE user_id=:uid
+            AND guild_id=:gid
+        """, {
+            "uid": ctx.message.author.id,
+            "gid": ctx.message.guild.id
+        }).fetchone()
+        cursor.close()
+
+        if info is None:
+            info = {"wl_limit": 10, "wl_boost": 1.0}
+
+        embed = discord.Embed(
+            title="Shop",
+            color=0xb3a700
+        )
+        embed.add_field(
+            name=f"Bonus",
+            value=f"💰 5000",
+            inline=False
+        )
+        lvl = store['wlsize'][info['wl_limit']]
+        embed.add_field(
+            name=f"Wishlist size (LVL. {lvl['lvl']})",
+            value=f"💰 {lvl['price']} (Next: +{lvl['next']})",
+            inline=True
+        )
+        lvl = store['wlboost'][info['wl_boost']]
+        embed.add_field(
+            name=f"Wishlist drop boost (LVL. {lvl['lvl']})",
+            value=f"💰 {lvl['price']} (Next: +{lvl['next']}%)",
+            inline=True
+        )
+
+        await send_embed(ctx, embed)
+
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.command(brief="Buy bonuses!", aliases=["bbonus", "bb"])
+    @commands.guild_only()
+    async def buybonus(self, ctx, amount: int = 1):
+        """
+        Buy bonuses!
+        """
+        check = await confirm(ctx, self.client,
+                              f"{ctx.message.author.mention}, "
+                              f"Are you sure you want to buy {amount} "
+                              f"bonuses for 💰 {amount * 5000}?")
+
+        if str(check.emoji) == "❌":
+            return
+
+        cursor = connection.cursor()
+        info = cursor.execute("""
+            SELECT bonuses, balance
+            FROM user
+            JOIN user_guild_data ON
+            (user_guild_data.user_id=user.id
+            AND user_guild_data.guild_id=:gid)
+            WHERE user.id=:uid
+        """, {
+            "uid": ctx.message.author.id,
+            "gid": ctx.message.guild.id
+        }).fetchone()
+
+        if info is None or info["balance"] < 5000 * amount:
+            cursor.close()
+            await send_message(ctx, "Not enough money.")
+            return
+
+        if info["bonuses"] + amount > 10:
+            cursor.close()
+            await send_message(ctx, "Can't buy bonuses to over than 10.")
+            return
+
+        cursor.execute("""
+            UPDATE user
+            SET bonuses=bonuses+:bought
+            WHERE id=:uid
+        """, {
+            "uid": ctx.message.author.id,
+            "bought": amount
+        })
+        cursor.execute("""
+            UPDATE user_guild_data
+            SET balance=balance-:cost
+            WHERE user_id=:uid
+            AND guild_id=:gid
+        """, {
+            "uid": ctx.message.author.id,
+            "gid": ctx.message.guild.id,
+            "cost": amount * 5000
+        })
+        connection.commit()
+        cursor.close()
+        await ctx.message.add_reaction("✅")
+
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.command(brief="Increase your wishlist size!",
+                      aliases=["bwlsize"])
+    @commands.guild_only()
+    async def buywishlistsize(self, ctx):
+        """
+        Increase your wishlist size!
+        """
+        cursor = connection.cursor()
+        info = cursor.execute("""
+            SELECT wl_limit
+            FROM user_guild_data
+            WHERE user_guild_data.user_id=:uid
+            AND user_guild_data.guild_id=:gid
+        """, {
+            "uid": ctx.message.author.id,
+            "gid": ctx.message.guild.id
+        }).fetchone()
+
+        if info is None:
+            info = {"wl_limit": 10, "balance": 0}
+
+        lvl = store["wlsize"][info["wl_limit"]]
+        if lvl["price"] == "X":
+            cursor.close()
+            await send_message(ctx, "Already maxed!")
+            return
+
+        check = await confirm(ctx, self.client,
+                              f"{ctx.message.author.mention}, "
+                              f"Are you sure you want to buy the boost "
+                              f"for 💰 {lvl['price']}?")
+
+        if str(check.emoji) == "❌":
+            return
+
+        balance = cursor.execute("""
+            SELECT balance
+            FROM user_guild_data
+            WHERE user_guild_data.user_id=:uid
+            AND user_guild_data.guild_id=:gid
+        """, {
+            "uid": ctx.message.author.id,
+            "gid": ctx.message.guild.id
+        }).fetchone()
+
+        if balance is None or lvl["price"] > balance["balance"]:
+            cursor.close()
+            await send_message(ctx, "Not enough money.")
+            return
+
+        cursor.execute("""
+            UPDATE user_guild_data
+            SET balance=balance-:cost,
+            wl_limit=wl_limit+:buff
+            WHERE user_id=:uid
+            AND guild_id=:gid
+        """, {
+            "uid": ctx.message.author.id,
+            "gid": ctx.message.guild.id,
+            "cost": lvl["price"],
+            "buff": lvl["next"]
+        })
+        connection.commit()
+        cursor.close()
+        await ctx.message.add_reaction("✅")
+
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.command(brief="Increase your wishlist size!",
+                      aliases=["bwlboost"])
+    @commands.guild_only()
+    async def buywishlistboost(self, ctx):
+        """
+        Increase your wishlist size!
+        """
+        cursor = connection.cursor()
+        info = cursor.execute("""
+            SELECT wl_boost
+            FROM user_guild_data
+            WHERE user_guild_data.user_id=:uid
+            AND user_guild_data.guild_id=:gid
+        """, {
+            "uid": ctx.message.author.id,
+            "gid": ctx.message.guild.id
+        }).fetchone()
+
+        if info is None:
+            info = {"wl_boost": 1.0, "balance": 0}
+
+        lvl = store["wlboost"][info["wl_boost"]]
+        if lvl["price"] == "X":
+            cursor.close()
+            await send_message(ctx, "Already maxed!")
+            return
+
+        check = await confirm(ctx, self.client,
+                              f"{ctx.message.author.mention}, "
+                              f"Are you sure you want to buy the boost "
+                              f"for 💰 {lvl['price']}?")
+
+        if str(check.emoji) == "❌":
+            return
+
+        balance = cursor.execute("""
+            SELECT balance
+            FROM user_guild_data
+            WHERE user_guild_data.user_id=:uid
+            AND user_guild_data.guild_id=:gid
+        """, {
+            "uid": ctx.message.author.id,
+            "gid": ctx.message.guild.id
+        }).fetchone()
+
+        if balance is None or lvl["price"] > balance["balance"]:
+            cursor.close()
+            await send_message(ctx, "Not enough money.")
+            return
+
+        cursor.execute("""
+            UPDATE user_guild_data
+            SET balance=balance-:cost,
+            wl_boost=wl_boost+:buff
+            WHERE user_id=:uid
+            AND guild_id=:gid
+        """, {
+            "uid": ctx.message.author.id,
+            "gid": ctx.message.guild.id,
+            "cost": lvl["price"],
+            "buff": lvl["next"] / 100
+        })
+        connection.commit()
+        cursor.close()
+        await ctx.message.add_reaction("✅")
+
+
+def setup(client):
+    """
+    Setup the Cog.
+    """
+    client.add_cog(Shopping(client))

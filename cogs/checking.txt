@@ -1,0 +1,171 @@
+import discord
+from discord.ext import commands
+
+from variables import connection  # pylint: disable=import-error
+from functions import send_message  # pylint: disable=import-error
+from functions import paginator  # pylint: disable=import-error
+from functions import get_next_vote  # pylint: disable=import-error
+from functions import send_embed  # pylint: disable=import-error
+
+
+class Checking(commands.Cog):
+    """
+    Commands related to checking information
+    on the album.
+    """
+
+    def __init__(self, client):
+        self.client = client
+
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.command(brief="Shows yours or others collection!",
+                      aliases=["collec"])
+    @commands.guild_only()
+    async def collection(self, ctx, member: discord.Member = None):
+        """
+        Shows yours or others collection!
+        """
+
+        if member is None:
+            member = ctx.message.author
+
+        cursor = connection.cursor()
+        collection = cursor.execute("""
+            SELECT anime.rank, anime.name, amount FROM obtains
+            JOIN anime ON (obtains.anime_id=anime.id)
+            WHERE user_id=:uid AND guild_id=:gid
+            ORDER BY rank
+        """, {"uid": member.id, "gid": ctx.message.guild.id}).fetchall()
+        cursor.close()
+
+        if not len(collection):
+            await send_message(ctx, f"{member.mention}'s collection is empty!")
+            return
+
+        await paginator(ctx, self.client, [discord.Embed(
+            title=f"{member} Collection List Page {(i + 25) // 25}",
+            description="\n".join(
+                map(lambda x: f"{x['amount']}x **#{x['rank']}** {x['name']}",
+                    collection[i:i+25])),
+            color=0x620db8
+        ) for i in range(0, len(collection), 25)])
+
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.command(brief="Shows this guild's ranking!")
+    @commands.guild_only()
+    async def ranking(self, ctx):
+        """
+        Shows this guild's ranking!
+        """
+        cursor = connection.cursor()
+        rows = cursor.execute("""
+            SELECT user.username, SUM(anime.value*obtains.amount) AS points
+            FROM obtains
+            JOIN user ON (obtains.user_id=user.id)
+            JOIN anime ON (obtains.anime_id=anime.id)
+            WHERE guild_id=:gid
+            GROUP BY user.username
+            ORDER BY points DESC
+        """, {"gid": ctx.message.guild.id}).fetchall()
+        cursor.close()
+
+        if not len(rows):
+            await send_message(ctx, "No one on the ranking yet!")
+            return
+
+        await paginator(ctx, self.client, [discord.Embed(
+            title="Ranking",
+            description="\n".join(
+                map(lambda x: f"**{x['username']}** - {x['points']}",
+                    rows[i:i+25])),
+            color=0xff0022
+        ) for i in range(0, len(rows), 25)])
+
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.command(brief="Check your or someone's profile!",
+                      aliases=["prof"])
+    @commands.guild_only()
+    async def profile(self, ctx, member: discord.Member = None):
+        """
+        Check your or someone's profile!
+        """
+        if member is None:
+            member = ctx.message.author
+
+        cursor = connection.cursor()
+        cvalue = cursor.execute("""
+            SELECT SUM(anime.value*obtains.amount) AS points,
+            MIN(anime.rank) AS rarest, user_guild_data.balance,
+            IFNULL(user_guild_data.rolls, 1) AS rolls,
+            IFNULL(user.daily, 1) AS daily,
+            IFNULL(user.mdaily, 1) AS mdaily,
+            user.bonuses, user.next_vote AS nvote
+            FROM user
+            LEFT JOIN obtains ON
+            (user.id=obtains.user_id
+            AND :gid=obtains.guild_id)
+            LEFT JOIN anime ON (anime.id=obtains.anime_id)
+            LEFT JOIN user_guild_data ON
+            (user.id=user_guild_data.user_id
+            AND :gid=user_guild_data.guild_id)
+            WHERE user.id=:uid
+        """, {
+            "uid": member.id,
+            "gid": ctx.message.guild.id
+        }).fetchone()
+        cursor.close()
+
+        embed = discord.Embed(
+            title=f"{member}'s Profile",
+            color=0xff8d6e
+        )
+        embed.add_field(
+            name=f"Collection's value",
+            value=f"🏆 {cvalue['points']}",
+            inline=True
+        )
+        embed.add_field(
+            name=f"Rarest sticker",
+            value=f"⭐ #{cvalue['rarest']}",
+            inline=True
+        )
+        embed.add_field(
+            name=f"Balance",
+            value=f"💰 {cvalue['balance']}",
+            inline=True
+        )
+        embed.add_field(
+            name=f"Rolls",
+            value=f"{'Available!' if cvalue['rolls'] else 'Already rolled'}",
+            inline=True
+        )
+        embed.add_field(
+            name=f"Daily",
+            value=f"{'Available!' if cvalue['daily'] else 'Already claimed'}",
+            inline=True
+        )
+        embed.add_field(
+            name=f"Daily money",
+            value=f"{'Available!' if cvalue['mdaily'] else 'Already claimed'}",
+            inline=True
+        )
+        embed.add_field(
+            name=f"Bonuses",
+            value=cvalue["bonuses"],
+            inline=True
+        )
+        embed.add_field(
+            name=f"Vote",
+            value=get_next_vote(cvalue["nvote"]),
+            inline=True
+        )
+        embed.set_thumbnail(url=member.avatar_url)
+
+        await send_embed(ctx, embed)
+
+
+def setup(client):
+    """
+    Setup the Cog.
+    """
+    client.add_cog(Checking(client))
