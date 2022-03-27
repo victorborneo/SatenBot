@@ -10,6 +10,7 @@ class General(commands.Cog):
     """
     Generic commands.
     """
+
     def __init__(self, client):
         self.client = client
 
@@ -87,6 +88,16 @@ class General(commands.Cog):
             cursor.close()
 
             await send_message(ctx, "Data wiped successfully")
+
+    @commands.cooldown(1, 60, commands.BucketType.user)
+    @commands.command(brief="Check Saten's source code on Github!")
+    async def github(self, ctx):
+        """
+            Check Saten's source code on Github!
+        """
+        await send_message(ctx,
+                           "Hello, fellow coder! Here's my source code!"
+                           "https://github.com/victorborneo/SatenBot")
 
 
 def setup(client):
