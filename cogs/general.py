@@ -96,7 +96,7 @@ class General(commands.Cog):
             Check Saten's source code on Github!
         """
         await send_message(ctx,
-                           "Hello, fellow coder! Here's my source code!"
+                           "Hello, fellow coder! Here's my source code!\n"
                            "https://github.com/victorborneo/SatenBot")
 
 
