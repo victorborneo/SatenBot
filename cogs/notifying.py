@@ -15,7 +15,7 @@ from functions import multiple_choices  # pylint: disable=import-error
 
 @tasks.loop(hours=1)
 async def notify_users(client):
-    jst = datetime.datetime.today() + datetime.timedelta(hours=14)
+    jst = datetime.datetime.today() + datetime.timedelta(hours=13)
 
     cursor = connection.cursor()
     cursor.execute("""
