@@ -24,3 +24,11 @@ If you have any doubts on how to use a command, just use ;help command_here, and
 she'll DM you how to use that command in details.
 
 Saten is a work in progress project. At the moment the server cost is higher than how much I make with donations, so I just keep her up because I love the project, and I hope you do too :)
+
+
+# Requirements <h1>
+1. discord.py
+2. discord-pretty-help
+3. beautifulsoup4
+4. aiohttp
+5. dblpy
