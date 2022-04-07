@@ -55,11 +55,12 @@ class Notifying(commands.Cog):
     """
     Commands related to Anime notification.
     """
+
     def __init__(self, client):
         self.client = client
 
     @commands.cooldown(1, 3, commands.BucketType.user)
-    @commands.command(brief="Notifies new episodes from airing animes.")
+    @commands.command(brief="Notifies new episodes from airing animes.", aliases=['n'])
     async def notify(self, ctx, *, name):
         """
         Notifies you whenever an airing anime has a new episode.
@@ -115,7 +116,8 @@ class Notifying(commands.Cog):
                            "Make sure to leave your DMs open!")
 
     @commands.cooldown(1, 3, commands.BucketType.user)
-    @commands.command(brief="Stops notifying new episodes from airing animes.")
+    @commands.command(brief="Stops notifying new episodes from airing animes.",
+                      aliases=["un"])
     async def unnotify(self, ctx, *, name):
         """
         Stops notifying new episodes from airing animes.
@@ -162,7 +164,7 @@ class Notifying(commands.Cog):
 
     @commands.cooldown(1, 5, commands.BucketType.user)
     @commands.command(brief="List of animes on notify.",
-                      aliases=["nlist"])
+                      aliases=["nlist", "nl"])
     @commands.guild_only()
     async def notifylist(self, ctx, member: discord.Member = None):
         """

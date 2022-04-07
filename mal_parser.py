@@ -39,7 +39,7 @@ def to_dict(object: List[object], rank_by: str = "id") -> Dict:
 def get_links(start: int = 0) -> List[str]:
     print("Finding last MAL Top Anime page...")
 
-    i = 380
+    i = 390
     pages_ = []
     while True:
         page = f"limit={50 * i}"
@@ -57,6 +57,7 @@ def get_links(start: int = 0) -> List[str]:
         else:
             i += 1
 
+    print(f"Last page = {i}")
     for j in range(start, i):
         page = f"limit={j * 50}"
         pages_.append(f"https://www.myanimelist.net/topanime.php?{page}")
