@@ -67,12 +67,14 @@ class Notifying(commands.Cog):
         """
         cursor = connection.cursor()
         results = cursor.execute("""
-            SELECT id, name, IFNULL(broadcast, 'Unknown') broadcast
+            SELECT id, name,
+            IFNULL(broadcast, 'Unknown') broadcast, airing
             FROM anime
             WHERE (name LIKE :name
             OR alt_name LIKE :name)
-            AND airing='Currently Airing'
-            AND broadcast!='Unknown'
+            AND ((airing='Currently Airing'
+            AND broadcast!='Unknown')
+            OR airing='Not yet aired')
             AND NOT EXISTS
             (SELECT * FROM notifies
             WHERE user_id=:uid
@@ -83,12 +85,13 @@ class Notifying(commands.Cog):
         if not len(results):
             await send_message(ctx, "No results. Maybe you are already being "
                                "notified by the anime with that name, or the "
-                               "anime is not currently airing, or the "
-                               "broadcasting is unknown.")
+                               "anime has already finished airing, or it is "
+                               "airing but the broadcasting is unknown.")
             cursor.close()
             return
 
-        text = "\n".join([f"{count} -> {anime['name']} at {anime['broadcast']}"
+        text = "\n".join([f"{count} -> {anime['name']} at {anime['broadcast']} " \
+                          f"({anime['airing']})"
                           for count, anime in enumerate(results)])
 
         confirm = await multiple_choices(ctx, self.client, f"```{text}```")
@@ -124,11 +127,14 @@ class Notifying(commands.Cog):
         """
         cursor = connection.cursor()
         results = cursor.execute("""
-            SELECT id, name, IFNULL(broadcast, 'Unknown') broadcast
+            SELECT id, name,
+            IFNULL(broadcast, 'Unknown') broadcast, airing
             FROM anime
             WHERE (name LIKE :name
             OR alt_name LIKE :name)
-            AND airing='Currently Airing'
+            AND ((airing='Currently Airing'
+            AND broadcast!='Unknown')
+            OR airing='Not yet aired')
             AND EXISTS
             (SELECT * FROM notifies
             WHERE user_id=:uid
@@ -142,7 +148,8 @@ class Notifying(commands.Cog):
             cursor.close()
             return
 
-        text = "\n".join([f"{count} -> {anime['name']} at {anime['broadcast']}"
+        text = "\n".join([f"{count} -> {anime['name']} at {anime['broadcast']} " \
+                          f"({anime['airing']})"
                           for count, anime in enumerate(results)])
 
         confirm = await multiple_choices(ctx, self.client, f"```{text}```")
@@ -177,7 +184,7 @@ class Notifying(commands.Cog):
 
         cursor = connection.cursor()
         results = cursor.execute("""
-            SELECT anime.name, anime.broadcast
+            SELECT anime.name, anime.broadcast, anime.airing
             FROM anime, notifies
             WHERE notifies.user_id=:uid
             AND notifies.anime_id=anime.id
@@ -191,7 +198,8 @@ class Notifying(commands.Cog):
         await paginator(ctx, self.client, [discord.Embed(
             title=f"{member} Notify List Page {(i + 10) // 10}",
             description="\n".join(
-                map(lambda x: f"{x['name']} - **{x['broadcast']}**",
+                map(lambda x: f"{x['name']} - **{x['broadcast']}** " \
+                    f"({x['airing']})",
                     results[i:i+10])),
             color=0x00ff00
         ) for i in range(0, len(results), 10)])
