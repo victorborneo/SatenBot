@@ -314,8 +314,7 @@ def update_database() -> None:
         for rank, score, code, premiere, type_, episode in animes:
             anime = db_animes.get(code)
 
-            if (anime is None) or (anime["airing"] == "Currently Airing") \
-                    or (anime["airing"] == "Not yet aired" and score != "N/A"):
+            if (anime is None) or (anime["airing"] != "Finished Airing"):
                 add_anime(cursor, code)
             elif anime["airing"] == "Finished Airing":
                 update_anime(cursor, db_animes[code], rank, score,
