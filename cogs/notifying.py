@@ -83,8 +83,9 @@ class Notifying(commands.Cog):
         if not len(results):
             await send_message(ctx, "No results. Maybe you are already being "
                                "notified by the anime with that name, or the "
-                               "anime has already finished airing, or it is "
-                               "airing but the broadcasting is unknown.")
+                               "anime has already finished airing, or the "
+                               "broadcasting is unknown, or it hasn't started "
+                               "airing yet.")
             cursor.close()
             return
 
