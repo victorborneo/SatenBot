@@ -101,7 +101,7 @@ class MyAnimeList(commands.Cog):
         ) for i in range(0, len(animes), 10)])
 
     @commands.cooldown(1, 3, commands.BucketType.user)
-    @commands.command(brief="Searches an anime.")
+    @commands.command(brief="Searches an anime.", aliases=["s"])
     async def search(self, ctx, *, name):
         """
         Searches an anime by its name
