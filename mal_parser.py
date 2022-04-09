@@ -3,7 +3,7 @@ import sys
 import time
 import uuid
 import urllib
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Tuple
 
 from bs4 import BeautifulSoup as bs
@@ -25,6 +25,30 @@ class HiddenPrints:
         sys.stdout.close()
         sys.stdout = self._original_stdout
 
+
+def is_date_close(date):
+    months = {
+        "Jan": 1, "Feb": 2, "Mar": 3,
+        "Apr": 4, "May": 5, "Jun": 6,
+        "Jul": 7, "Aug": 8, "Sep": 9,
+        "Oct": 10, "Nov": 11, "Dec": 12
+    }
+
+    try:
+        date = date.replace(",", "").split(" ")
+        date = datetime.strptime(
+            f"{date[2]}-{months[date[0]]}-{date[1]}",
+            "%Y-%m-%d"
+        ) - timedelta(days=6)
+    except Exception as err:
+        print(f"Error converting: {err}")
+        return False
+
+    jst = datetime.today() + timedelta(hours=13)
+
+    if jst > date:
+        return True
+    return False
 
 def to_dict(object: List[object], rank_by: str = "id") -> Dict:
     dict_ = {}
@@ -221,6 +245,8 @@ def parse_details(html: str) -> Dict:
 
     airing = doc.find_all(text="Status:")[1].parent.parent. \
         decode_contents().split("</span>")[1].strip()
+    if airing == "Not yet aired" and is_date_close(premiere):
+        airing = "About to air"
     name = doc.find(class_="title-name").string
     rank = doc.find(text="Ranked ").parent.strong.string.strip("#")
 
