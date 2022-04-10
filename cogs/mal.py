@@ -154,6 +154,38 @@ class MyAnimeList(commands.Cog):
 
         await send_embed(ctx, embed)
 
+    @commands.cooldown(1, 5, commands.BucketType.user)
+    @commands.command(bried="Checks animes releasing in the next 6 days.",
+                      aliases=["r"])
+    @commands.guild_only()
+    async def releases(self, ctx):
+        """
+        Checks animes releasing in the next 6 days.
+        """
+        cursor = connection.cursor()
+        animes = cursor.execute("""
+            SELECT name, premiere
+            FROM anime
+            WHERE airing='About to air'
+            ORDER BY premiere
+            LIMIT 1000
+        """).fetchall()
+        cursor.close()
+
+        if not len(animes):
+            await send_message(ctx, "No animes releasing soon!")
+            return
+
+        await paginator(ctx, self.client, [discord.Embed(
+            title=f"Anime Page {(i + 10) // 10}",
+            description="\n".join(
+                map(
+                    lambda x: f"{x['name']} **{x['premiere']}**",
+                    animes[i:i + 10])
+                ),
+            color=0x0000ff
+        ) for i in range(0, len(animes), 10)])
+
 
 def setup(client):
     """
