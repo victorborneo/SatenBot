@@ -14,11 +14,13 @@ class MyAnimeList(commands.Cog):
     """
     Commands related to MAL.
     """
+
     def __init__(self, client):
         self.client = client
 
     @commands.cooldown(1, 15, commands.BucketType.user)
-    @commands.command(brief="Checks MAL's top animes.")
+    @commands.command(brief="Checks MAL's top animes.",
+                      aliases=["t"])
     @commands.guild_only()
     async def top(self, ctx):
         """
@@ -40,7 +42,8 @@ class MyAnimeList(commands.Cog):
         ) for i in range(0, 1000, 10)])
 
     @commands.cooldown(1, 15, commands.BucketType.user)
-    @commands.command(bried="Checks MAL'S top airing anime.")
+    @commands.command(bried="Checks MAL'S top airing anime.",
+                      aliases=["ta"])
     @commands.guild_only()
     async def topairing(self, ctx):
         """
@@ -68,7 +71,8 @@ class MyAnimeList(commands.Cog):
         ) for i in range(0, len(animes), 10)])
 
     @commands.cooldown(1, 5, commands.BucketType.user)
-    @commands.command(bried="Checks MAL'S top anime with an specific genre.")
+    @commands.command(bried="Checks MAL'S top anime with an specific genre.",
+                      aliases=["tg"])
     @commands.guild_only()
     async def topgenre(self, ctx, *, genre):
         """

@@ -15,7 +15,8 @@ class General(commands.Cog):
         self.client = client
 
     @commands.cooldown(1, 60, commands.BucketType.user)
-    @commands.command(brief="Sends Saten's invite link!")
+    @commands.command(brief="Sends Saten's invite link!",
+                      aliases=["inv"])
     async def invite(self, ctx):
         """
         DMs Saten's invite link!
