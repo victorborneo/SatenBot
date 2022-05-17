@@ -41,7 +41,7 @@ async def send_picture(ctx: object, endpoint: str,
         await send_message(ctx, "NSFW channel required!")
         return
 
-    link = f"https://shiro.gg/api/images/{endpoint}"
+    link = f"https://api.dbot.dev/images/{endpoint}"
 
     async with aiohttp.ClientSession() as session:
         try:
