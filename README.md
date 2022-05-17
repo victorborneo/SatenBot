@@ -32,3 +32,4 @@ Saten is a work in progress project. At the moment the server cost is higher tha
 3. beautifulsoup4
 4. aiohttp
 5. dblpy
+6. discord-py-interactions
