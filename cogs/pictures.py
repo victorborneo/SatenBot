@@ -14,6 +14,22 @@ class Pictures(commands.Cog):
         self.client = client
 
     @commands.cooldown(1, 2, commands.BucketType.user)
+    @commands.command(brief="Anime picture")
+    async def anime(self, ctx):
+        """
+        Anime picture
+        """
+        await send_picture(ctx, "anime", "Here you go")
+
+    @commands.cooldown(1, 2, commands.BucketType.user)
+    @commands.command(brief="Trap picture")
+    async def trap(self, ctx):
+        """
+        Trap picture
+        """
+        await send_picture(ctx, "trap", "Here you go")
+
+    @commands.cooldown(1, 2, commands.BucketType.user)
     @commands.command(brief="Sleeping anime picture")
     async def sleep(self, ctx):
         """
