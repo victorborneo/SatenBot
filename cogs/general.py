@@ -22,9 +22,9 @@ class General(commands.Cog):
         DMs Saten's invite link!
         """
         await send_message(ctx, "Here's my invite link!\n"
-                           "https://discord.com/api/oauth2/"
-                           "authorize?client_id=798341045607071814&"
-                           "permissions=301214790&scope=bot")
+                           "https://discord.com/api/oauth2/authorize?"
+                           "client_id=798341045607071814&permissions="
+                           "301205574&scope=bot%20applications.commands")
 
     @commands.cooldown(1, 60, commands.BucketType.user)
     @commands.command(brief="Sends Saten's official support "
@@ -50,7 +50,7 @@ class General(commands.Cog):
     @commands.command(brief="Sends Saten's Top.gg page!")
     async def vote(self, ctx):
         """
-        DMs Saten's Patreon!
+        DMs Saten's Top.gg page!
         """
         cursor = connection.cursor()
         nvote = cursor.execute("""
