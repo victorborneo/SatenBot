@@ -37,9 +37,6 @@ async def send_embed(ctx: object, embed: object,
 
 async def send_picture(ctx: object, endpoint: str,
                        message: str = None, nsfw: bool = False) -> None:
-    await send_message(ctx, "Picture commands temporarily disabled! "
-                       "Shiro.gg's API is down under rework.")
-    return
     if nsfw and not ctx.message.channel.is_nsfw():
         await send_message(ctx, "NSFW channel required!")
         return
