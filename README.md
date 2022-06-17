@@ -2,6 +2,7 @@ SatenBot
 ===================
 
 A verified bot for Discord with anime-related commands and features!
+**Vote and invite the bot [here](https://top.gg/bot/798341045607071814)!**
 
 # Sad message ahead <h1>
 I started Saten as a hobby, never really expected to make money out of it.
@@ -9,8 +10,6 @@ I started Saten as a hobby, never really expected to make money out of it.
 Starting from September 1st 2022, Discord is demanding all bots to adapt to slash commands. Unfortunately, I'm an university student that also has to work, so I barely have any time for my personal projects. Also, Saten's server costs were higher than what I was making out of donations, which wasn't a good thing neither.
 
 Therefore, I decided to close Saten, it's been fun while it lasted. Her code is still open source at GitHub for the interested ones. Thanks for those that supported me :)
-
-**Vote and invite the bot [here](https://top.gg/bot/798341045607071814)!**
 
 # Saten's purpose <h1>
 Quickly get information on any anime without having to open your browser.
