@@ -60,10 +60,10 @@ class Notifying(commands.Cog):
         self.client = client
 
     @commands.cooldown(1, 3, commands.BucketType.user)
-    @commands.command(brief="Notifies new episodes from airing animes.", aliases=['n'])
+    @commands.command(brief="Notifies new episodes of animes.", aliases=['n'])
     async def notify(self, ctx, *, name):
         """
-        Notifies you whenever an airing anime has a new episode.
+        Notifies you whenever an anime has a new episode, airing or not yet aired.
         """
         cursor = connection.cursor()
         results = cursor.execute("""

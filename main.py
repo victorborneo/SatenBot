@@ -4,6 +4,7 @@ from datetime import datetime
 
 import discord
 from discord.ext import commands
+from discord_slash import SlashCommand
 from pretty_help import DefaultMenu, PrettyHelp
 
 from functions import send_message
@@ -20,7 +21,8 @@ with open(f"{database}.sql", "r") as f:
 intents = discord.Intents().default()
 activity = discord.Game(name=";help")
 client = commands.Bot(command_prefix=prefix, intents=intents,
-                      activity=activity, case_insensitive=True)
+                      activity=activity, case_insensitive=True)  # self_bot=True
+slash = SlashCommand(client, sync_commands=True)
 
 for filename in os.listdir("./cogs"):
     if filename.endswith(".py"):

@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord_slash import cog_ext, SlashContext
 
 from functions import send_embed  # pylint: disable=import-error
 from functions import paginator  # pylint: disable=import-error
@@ -17,6 +18,13 @@ class MyAnimeList(commands.Cog):
 
     def __init__(self, client):
         self.client = client
+
+    @cog_ext.cog_slash(
+        name='test',
+        guild_ids=[798335764555366411]
+    )
+    async def _test(self, ctx: SlashContext):
+        await ctx.send('worked!')
 
     @commands.cooldown(1, 15, commands.BucketType.user)
     @commands.command(brief="Checks MAL's top animes.",
